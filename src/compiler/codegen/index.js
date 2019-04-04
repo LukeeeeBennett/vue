@@ -76,7 +76,7 @@ export function genElement (el: ASTElement, state: CodegenState): string {
       code = genComponent(el.component, el, state)
     } else {
       let data
-      if (!el.plain || (el.pre && state.maybeComponent(el))) {
+      if (!el.plain || ((el.pre || el.children.length > 0) && state.maybeComponent(el))) {
         data = genData(el, state)
       }
 
@@ -270,6 +270,8 @@ export function genData (el: ASTElement, state: CodegenState): string {
   // scoped slots
   if (el.scopedSlots) {
     data += `${genScopedSlots(el, el.scopedSlots, state)},`
+  } else if (el.children.length > 0 && state.maybeComponent(el)) {
+    data += `${genImplicitDefaultScopedSlot(el, state)},`
   }
   // component v-model
   if (el.model) {
@@ -415,6 +417,17 @@ function genScopedSlots (
   })`
 }
 
+function genImplicitDefaultScopedSlot (
+  el: ASTElement,
+  state: CodegenState
+): string {
+  el.slotScope = emptySlotScopeToken
+  const data = genScopedSlots(el, { default: el }, state)
+  el.children = []
+
+  return data
+}
+
 function hash(str) {
   let hash = 5381
   let i = str.length
@@ -449,7 +462,7 @@ function genScopedSlot (
     ? ``
     : String(el.slotScope)
   const fn = `function(${slotScope}){` +
-    `return ${el.tag === 'template'
+    `return ${el.tag === 'template' || state.maybeComponent(el)
       ? el.if && isLegacySyntax
         ? `(${el.if})?${genChildren(el, state) || 'undefined'}:undefined`
         : genChildren(el, state) || 'undefined'
